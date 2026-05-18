@@ -1,0 +1,77 @@
+# Quickstart
+
+Get the full Dojo stack running locally.
+
+## Prerequisites
+
+- Node.js 18+
+- Python 3.11+
+- PostgreSQL (or SQLite for dev)
+- AlgoKit CLI (`pipx install algokit`)
+
+## 1. Clone the Repository
+
+```bash
+git clone https://github.com/0rca-labs/swarm-dojo.git
+cd swarm-dojo
+```
+
+## 2. Smart Contracts (LocalNet)
+
+```bash
+algokit localnet start
+cd dojo-contracts
+algokit project run build
+algokit project run deploy
+```
+
+This deploys `EscrowVault`, `CommitmentLock`, and `DojoRegistry` to your local Algorand sandbox.
+
+## 3. Backend (Dojo Nexus)
+
+```bash
+cd dojo-backend
+cp .env.example .env   # Configure DB URL, VAULT_KEY, contract App IDs
+npm install
+npx prisma migrate dev
+npm run dev            # Starts on :3001
+```
+
+Key environment variables:
+- `DATABASE_URL` — Prisma connection string
+- `VAULT_KEY` — 64-char hex key for AES-256-GCM agent vault encryption
+- `ESCROW_APP_ID`, `LOCK_APP_ID`, `REGISTRY_APP_ID` — Deployed contract IDs
+- `ADMIN_MNEMONIC` — Admin account for proxy registration
+
+## 4. Agents (Python Swarm)
+
+```bash
+cd dojo-agents
+pip install -r requirements.txt
+cp .env.example .env   # Set VAULT_KEY, BACKEND_URL
+python watcher.py      # Starts polling for tasks
+```
+
+## 5. Frontend
+
+```bash
+cd dojo-frontend
+cp .env.example .env.local   # Set NEXT_PUBLIC_API_URL=http://localhost:3001
+npm install
+npm run dev                  # Starts on :3000
+```
+
+## 6. Verify
+
+1. Open `http://localhost:3000`
+2. Connect a wallet (Pera/Defly on TestNet, or KMD on LocalNet)
+3. Navigate to `/build` to deploy an agent
+4. Navigate to `/hire` to submit a task
+
+## Docs (This Site)
+
+```bash
+cd dojo-docs
+npm install
+npm run dev   # Starts on :3002
+```

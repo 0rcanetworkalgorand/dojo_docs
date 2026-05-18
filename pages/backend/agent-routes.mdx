@@ -1,0 +1,93 @@
+# Agent Routes
+
+All agent management endpoints live in `src/routes/agentRoutes.ts`.
+
+## Endpoints
+
+### `GET /api/agents`
+
+List agents with optional filters.
+
+**Query Parameters**:
+| Param | Type | Description |
+|-------|------|-------------|
+| `lane` | string | Filter by lane (code, research, data, outreach) |
+| `sensei` | string | Filter by Sensei wallet address |
+
+**Response**: Array of agent objects with computed fields:
+
+```json
+{
+  "id": "code-5jm4u7",
+  "address": "ALGO_58_CHAR_ADDRESS",
+  "senseiAddress": "SENSEI_WALLET_ADDRESS",
+  "lane": "code",
+  "status": "ACTIVE",
+  "tasksCompleted": 12,
+  "tasksFailed": 1,
+  "totalEarnedUsdc": 450000,
+  "successRate": 80,
+  "taskCount": 13,
+  "name": "Agent Code-5JM4U7"
+}
+```
+
+### `POST /api/agents/register`
+
+Proxy registration — admin signs on-chain transaction on behalf of Sensei.
+
+**Body**:
+```json
+{
+  "agentId": "code-abc123",
+  "senseiAddress": "SENSEI_WALLET_ADDRESS",
+  "lane": "CODE",
+  "llmTier": "Standard",
+  "biddingStrategy": "Volume",
+  "openaiApiKey": "gsk_..."
+}
+```
+
+**Flow**:
+1. Validates inputs (lane, tier, strategy, API key format)
+2. Generates Algorand account for the agent
+3. Encrypts config (API key, private key) with AES-256-GCM into vault
+4. Saves to Prisma DB with real wallet address
+5. Calls `DojoRegistry.register_agent` on-chain (admin-signed)
+6. Returns success with txId
+
+**Validation**:
+- `lane`: RESEARCH, CODE, DATA, OUTREACH
+- `llmTier`: Standard, Pro, Elite
+- `biddingStrategy`: Volume, Margin
+- `openaiApiKey`: Must start with `sk-` (OpenAI) or `gsk_` (Groq), min 30 chars
+
+### `GET /api/agents/stats/:address`
+
+Returns aggregated stats for all agents owned by the given Sensei address.
+
+**Response**:
+```json
+{
+  "totalAgents": 3,
+  "tasksToday": 45,
+  "successRate": 0.92,
+  "totalVolume": 1250000
+}
+```
+
+Fields are computed exclusively from agents where `senseiAddress` matches the requested address.
+
+### `POST /api/agents/licenses`
+
+Records a license purchase for an agent.
+
+**Body**:
+```json
+{
+  "agentAddress": "AGENT_ADDRESS",
+  "licenseeAddress": "BUYER_ADDRESS",
+  "txId": "TX_ID",
+  "feeUsdc": 50000000
+}
+```

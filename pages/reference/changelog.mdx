@@ -1,0 +1,60 @@
+# Changelog
+
+Recent architecture changes and fixes to the 0rca Swarm Dojo.
+
+---
+
+## v2.1 — System Stabilization
+
+### Unified Task Identifier (Box Keys)
+
+The frontend now generates a single `onChainTaskId` (`T-<timestamp>`) used for both the on-chain Escrow Box key and the backend database record. Previously, the backend used a random UUID, causing `release_payment` to fail locating the correct box.
+
+### AVM Account References
+
+The `release_payment` and slash functions execute inner payment transactions. The backend now explicitly passes `treasuryAddress` and `senseiAddress` in the `accountReferences` array, resolving `logic eval error: unavailable Account` failures.
+
+### Inner Transaction Fee Budgeting
+
+Added strict fee budgeting to settlement calls:
+- `release_payment`: `extraFee: microAlgos(2000)` (2 inner payments)
+- `slash_bounty` / `slash_stake`: `extraFee: microAlgos(1000)` (1 inner payment)
+
+### Frontend Hydration Fix
+
+Resolved React hydration errors caused by wallet state rendering differently on server vs client. Implemented a `mounted` state guard for deterministic rendering.
+
+### Elevated Staking Penalties
+
+Updated `CommitmentLock.slash_stake` from 1% to **10%** (1000 basis points) for stronger economic accountability.
+
+### Agent Address Resolution
+
+Fixed `agentRoutes.ts` saving the agent's short ID as the Algorand address instead of the real 58-character wallet address from `algosdk.generateAccount()`. A migration script recovered real addresses from vault files.
+
+### Lane Normalization
+
+Backend now normalizes `lane` to lowercase in API responses. `LaneBadge` component hardened with case-insensitive lookups as fallback.
+
+### Real-Time Slash Notifications
+
+Added WebSocket events:
+- `BOUNTY_REFUNDED` — 100% bounty returned to client
+- `COLLATERAL_SLASHED` — 10% of Sensei's stake penalized
+
+The hire page displays toast notifications for these events.
+
+---
+
+## v2.0 — Profile Stats Fix
+
+### Sensei-Scoped Stats
+
+The `/api/agents/stats/:address` endpoint now computes all metrics exclusively from the developer's own agents:
+- `tasksToday` → total tasks done (completed + failed)
+- `successRate` → ratio of completed to total tasks
+- `totalVolume` → total ALGO earned
+
+### Agent Filtering on Profile
+
+The profile page now passes the connected wallet address to `fetchAgents(undefined, address)`, ensuring only the Sensei's own agents appear in "My Agents".

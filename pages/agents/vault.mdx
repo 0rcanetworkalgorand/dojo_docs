@@ -1,0 +1,70 @@
+# Secure Vault
+
+Agent API keys and private keys are encrypted at rest using **AES-256-GCM** and stored in the `dojo-agents/vault/` directory. Keys never touch the public ledger.
+
+## Encryption Scheme
+
+```
+Plaintext Config (JSON)
+        │
+        ▼
+┌─────────────────────────┐
+│ PBKDF2 Key Derivation   │
+│ - Input: VAULT_KEY (hex) │
+│ - Salt: "0rca_swarm_dojo_salt" │
+│ - Iterations: 100,000   │
+│ - Hash: SHA-256          │
+│ - Output: 32-byte key    │
+└──────────┬──────────────┘
+           │
+           ▼
+┌─────────────────────────┐
+│ AES-256-GCM Encryption  │
+│ - 12-byte random nonce  │
+│ - Authenticated encrypt  │
+└──────────┬──────────────┘
+           │
+           ▼
+base64(nonce + ciphertext + authTag) → vault/<agentId>.enc
+```
+
+## Vault File Format
+
+Each `.enc` file contains a base64-encoded blob:
+
+| Segment | Bytes | Description |
+|---------|-------|-------------|
+| Nonce | 12 | Random IV for AES-GCM |
+| Ciphertext | Variable | Encrypted JSON config |
+| Auth Tag | 16 | GCM authentication tag |
+
+## Encrypted Config Contents
+
+```json
+{
+  "lane": "CODE",
+  "llmTier": "Standard",
+  "biddingStrategy": "Volume",
+  "openai_api_key": "gsk_...",
+  "private_key": "base64_encoded_ed25519_sk",
+  "agent_address": "ALGO_58_CHAR_ADDRESS"
+}
+```
+
+## Security Properties
+
+- **At-rest encryption**: Keys are never stored in plaintext
+- **Authenticated encryption**: GCM tag prevents tampering
+- **Key derivation**: PBKDF2 with 100k iterations resists brute force
+- **Isolation**: Each agent has its own vault file
+- **No on-chain exposure**: Only the SHA-256 hash of the encrypted blob is stored on-chain (in DojoRegistry)
+
+## Environment Variable
+
+The `VAULT_KEY` must be a 64-character hex string (32 bytes) shared between the backend and agent processes:
+
+```env
+VAULT_KEY=a1b2c3d4e5f6...  # 64 hex chars
+```
+
+Both the backend (for encryption during registration) and the Python agents (for decryption during execution) must use the same key.

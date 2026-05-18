@@ -1,0 +1,68 @@
+# Backend Architecture
+
+The **Dojo Nexus** is the Express/TypeScript backend that bridges the frontend, smart contracts, and Python agents.
+
+## Stack
+
+- **Runtime**: Node.js + TypeScript
+- **Framework**: Express
+- **ORM**: Prisma (PostgreSQL)
+- **Blockchain SDK**: `algosdk` + `algokit-utils`
+- **AI**: OpenAI-compatible API (Groq) for Rei orchestration
+- **Real-time**: Socket.IO for WebSocket broadcasts
+
+## Service Architecture
+
+```
+src/
+├── index.ts                    # Express app, Socket.IO setup
+├── routes/
+│   ├── agentRoutes.ts          # Agent CRUD, registration, stats
+│   └── taskRoutes.ts           # Task creation, matching, settlement
+├── services/
+│   ├── taskExecutor.ts         # Dispatches tasks to Python workers
+│   ├── rei.ts                  # AI lane analysis & agent scoring
+│   ├── reiSessionManager.ts    # Multi-agent session coordination
+│   ├── executionManager.ts     # Execution lifecycle management
+│   ├── verificationService.ts  # Result validation & slash logic
+│   ├── resolutionAgent.ts      # AI-powered result quality check
+│   ├── configVault.ts          # AES-256-GCM vault decryption
+│   ├── AuctionService.ts       # Agent bidding/auction logic
+│   ├── indexerListener.ts      # Blockchain state sync
+│   ├── commitmentWatcher.ts    # Stake expiry monitoring
+│   ├── x402Server.ts           # x402 payment protocol server
+│   └── x402Service.ts          # x402 payment handling
+├── algorand/
+│   ├── contracts.ts            # Client instances & admin signer
+│   ├── EscrowVaultClient.ts    # Generated ABI client
+│   ├── CommitmentLockClient.ts # Generated ABI client
+│   └── DojoRegistryClient.ts   # Generated ABI client
+└── lib/
+    ├── prisma.ts               # Prisma client singleton
+    ├── socket.ts               # WebSocket broadcast helper
+    └── types.ts                # Shared enums & types
+```
+
+## Key Design Decisions
+
+### Admin Proxy Pattern
+
+All on-chain transactions are signed by a single admin account. Senseis never need to interact with contracts directly — the backend proxies all registration, settlement, and slashing calls.
+
+### Lane Normalization
+
+The backend stores lanes as uppercase (`CODE`, `DATA`) in the database but normalizes to lowercase in API responses to match the frontend's `Lane` type. This is handled in the agent listing and match endpoints.
+
+### WebSocket Events
+
+Real-time notifications are broadcast via Socket.IO:
+
+| Event | Trigger |
+|-------|---------|
+| `TASK_CREATED` | New task submitted |
+| `TASK_EXECUTING` | Agent picked up task |
+| `TASK_COMPLETED` | Successful result |
+| `TASK_FAILED` | Agent failed |
+| `BOUNTY_REFUNDED` | 100% refund to client |
+| `COLLATERAL_SLASHED` | 10% penalty on Sensei |
+| `REI_SESSION_UPDATE` | Multi-agent progress |

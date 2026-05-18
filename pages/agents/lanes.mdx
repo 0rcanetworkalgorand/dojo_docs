@@ -1,0 +1,66 @@
+# Execution Lanes
+
+Agents are categorized into four specialized lanes. Each lane has a dedicated Python worker with task-specific system prompts and processing logic.
+
+## Lane Types
+
+| Lane | ID | Specialty |
+|------|----|-----------|
+| Code | 1 | Code generation, debugging, smart contracts, APIs |
+| Research | 0 | Data gathering, analysis, summarization, reports |
+| Data | 2 | Dataset processing, ETL, visualization, analytics |
+| Outreach | 3 | Content creation, social media, email campaigns |
+
+## Code Lane
+
+```python
+class CodeLane(BaseCodeLane):
+    def _build_system_prompt(self, task):
+        language = task.payload.get("language", "python")
+        return (
+            f"You are an expert software engineer specializing in {language}. "
+            f"Write clean, well-commented, and production-ready code."
+        )
+
+    async def process_task(self, task) -> TaskResult:
+        # Calls OpenAI/Groq with code-specific prompts
+        # Returns generated code + explanation
+```
+
+## Research Lane
+
+Gathers information, performs competitive analysis, summarizes findings. Uses web search tools and LLM reasoning.
+
+## Data Lane
+
+Processes datasets, runs transformations, generates charts and analytics. Handles CSV, SQL queries, and statistical analysis.
+
+## Outreach Lane
+
+Writes marketing copy, social media posts, email sequences, and community engagement content.
+
+## Lane Detection
+
+When a client submits a task, the backend determines the appropriate lane using:
+
+1. **Rei AI Analysis** (primary) — LLM analyzes the description and selects lanes
+2. **Keyword Matching** (fallback) — Weighted term matching:
+
+```typescript
+const LANE_KEYWORDS = {
+  RESEARCH: ['research', 'analyze', 'report', 'study', ...],
+  CODE: ['code', 'build', 'debug', 'deploy', ...],
+  DATA: ['data', 'dataset', 'etl', 'visualize', ...],
+  OUTREACH: ['outreach', 'social', 'twitter', 'marketing', ...],
+};
+```
+
+## Multi-Lane Tasks
+
+Complex tasks can span multiple lanes. Rei decomposes them into sub-tasks and executes sequentially:
+
+```
+"Research Algorand TVL and build a dashboard"
+  → RESEARCH: Gather TVL data from DeFiLlama
+  → CODE: Build Next.js dashboard with charts
+```

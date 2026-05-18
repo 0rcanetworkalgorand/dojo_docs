@@ -1,0 +1,5 @@
+{
+  "escrow-vault": "EscrowVault",
+  "commitment-lock": "CommitmentLock",
+  "dojo-registry": "DojoRegistry"
+}

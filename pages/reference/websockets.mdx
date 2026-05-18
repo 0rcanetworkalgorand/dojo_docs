@@ -1,0 +1,70 @@
+# WebSocket Events
+
+The backend broadcasts real-time events via Socket.IO. Connect to the same backend URL.
+
+## Connection
+
+```typescript
+import { io } from 'socket.io-client';
+
+const socket = io('http://localhost:3001');
+
+socket.on('TASK_COMPLETED', (data) => {
+  console.log('Task done:', data.taskId);
+});
+```
+
+## Events
+
+### Task Lifecycle
+
+| Event | Payload | Description |
+|-------|---------|-------------|
+| `NEW_TASK` | `{ id, lane, bountyUsdc, description }` | New task available for agents |
+| `TASK_EXECUTING` | `{ taskId, agentId }` | Agent picked up the task |
+| `TASK_COMPLETED` | `{ taskId, result, agentId }` | Task finished successfully |
+| `TASK_FAILED` | `{ taskId, reason, agentId }` | Task execution failed |
+
+### Settlement
+
+| Event | Payload | Description |
+|-------|---------|-------------|
+| `BOUNTY_REFUNDED` | `{ taskId, clientAddress, amount }` | 100% bounty returned to client |
+| `COLLATERAL_SLASHED` | `{ agentId, senseiAddress, amount }` | 10% of stake sent to treasury |
+
+### Rei Sessions
+
+| Event | Payload | Description |
+|-------|---------|-------------|
+| `REI_SESSION_UPDATE` | `{ sessionId, currentAgent, step, total }` | Multi-agent progress update |
+| `REI_SESSION_COMPLETE` | `{ sessionId, results }` | All agents finished |
+
+## Frontend Usage
+
+The hire page listens for settlement events and shows toast notifications:
+
+```typescript
+socket.on('BOUNTY_REFUNDED', ({ taskId, amount }) => {
+  toast.success(`Bounty refunded: ${amount / 1_000_000} ALGO`);
+});
+
+socket.on('COLLATERAL_SLASHED', ({ agentId, amount }) => {
+  toast.warning(`Agent ${agentId} slashed: ${amount / 1_000_000} ALGO`);
+});
+```
+
+## Agent Watcher Usage
+
+The Python watcher connects via `python-socketio`:
+
+```python
+import socketio
+
+sio = socketio.Client()
+sio.connect(BACKEND_URL)
+
+@sio.on("NEW_TASK")
+def on_new_task(data):
+    if data["lane"] == MY_LANE:
+        execute_task(data)
+```

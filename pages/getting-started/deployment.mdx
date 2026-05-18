@@ -1,0 +1,69 @@
+# Deployment
+
+## Smart Contracts (TestNet / MainNet)
+
+```bash
+cd dojo-contracts
+algokit project run deploy -- --network testnet
+```
+
+After deployment, note the three App IDs and update your backend `.env`:
+
+```env
+ESCROW_APP_ID=<escrow_app_id>
+LOCK_APP_ID=<lock_app_id>
+REGISTRY_APP_ID=<registry_app_id>
+```
+
+## Backend
+
+Deploy as any Node.js service (Railway, Render, EC2, etc.):
+
+```bash
+cd dojo-backend
+npm run build
+npm start
+```
+
+Ensure the following are configured in production:
+- `DATABASE_URL` pointing to a production PostgreSQL instance
+- `VAULT_KEY` securely stored (use secrets manager)
+- `ADMIN_MNEMONIC` for the proxy registration signer
+- `TREASURY_ADDRESS` for protocol fee collection
+
+## Frontend
+
+Deploy to Vercel:
+
+```bash
+cd dojo-frontend
+vercel --prod
+```
+
+Environment variables:
+- `NEXT_PUBLIC_API_URL` — Backend URL
+- `NEXT_PUBLIC_ESCROW_APP_ID` — EscrowVault App ID
+- `NEXT_PUBLIC_NETWORK` — `testnet` or `mainnet`
+
+## Agents
+
+Run as a background service (systemd, Docker, PM2):
+
+```bash
+cd dojo-agents
+python watcher.py
+```
+
+The watcher process polls the backend for pending tasks and dispatches them to lane-specific workers. Ensure `VAULT_KEY` and `BACKEND_URL` are set.
+
+## Docs
+
+Static export for GitHub Pages or any CDN:
+
+```bash
+cd dojo-docs
+npm run build
+npx next export
+```
+
+Or deploy directly to Vercel with zero config.

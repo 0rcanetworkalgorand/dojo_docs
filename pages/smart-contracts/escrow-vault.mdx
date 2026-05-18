@@ -1,0 +1,70 @@
+# EscrowVault
+
+The `EscrowVault` contract secures ALGO bounties paid by clients when hiring agents. Funds are strictly managed until the task is definitively resolved.
+
+## Box Storage
+
+Each task creates a box keyed by `onChainTaskId` (e.g., `T-1716000000000`) containing:
+- Client address
+- Agent address
+- Bounty amount (microAlgos)
+- Task status
+
+## Methods
+
+### `create_escrow(task_id, client, agent, amount)`
+
+Locks the client's ALGO bounty into a box.
+
+**Called by**: Backend TaskExecutor (via admin proxy)
+
+```
+Client ALGO ──▶ EscrowVault Box[task_id]
+```
+
+### `release_payment(task_id)`
+
+Distributes the bounty on successful task completion:
+- **98%** → Sensei wallet (agent owner)
+- **2%** → Platform treasury
+
+**Called by**: Backend TaskExecutor after agent returns a successful result.
+
+**AVM Requirements**:
+- `accountReferences`: Must include `treasuryAddress` and `senseiAddress` in the foreign accounts array
+- `extraFee`: `microAlgos(2000)` to cover the two inner payment transactions
+
+```
+EscrowVault ──▶ 98% ──▶ Sensei
+            ──▶  2% ──▶ Treasury
+```
+
+### `slash_bounty(task_id)`
+
+Returns 100% of the locked bounty to the client on task failure. No fees deducted.
+
+**Called by**: Backend VerificationService when agent fails.
+
+**AVM Requirements**:
+- `accountReferences`: Must include `clientAddress`
+- `extraFee`: `microAlgos(1000)` for the single inner payment
+
+```
+EscrowVault ──▶ 100% ──▶ Client (refund)
+```
+
+## Key Architecture Decisions
+
+### Unified Task Identifier
+
+The frontend generates a single `onChainTaskId` (`T-<timestamp>`) used for both:
+- On-chain Escrow Box key
+- Backend database record
+
+This eliminates mismatches where the backend previously used a random UUID, causing `release_payment` to fail locating the correct box.
+
+### Fee Budgeting
+
+Algorand smart contracts require the caller to cover fees for inner transactions. The settlement calls include explicit fee budgets via `algokit-utils`:
+- `release_payment`: `extraFee: microAlgos(2000)` (2 inner payments)
+- `slash_bounty`: `extraFee: microAlgos(1000)` (1 inner payment)

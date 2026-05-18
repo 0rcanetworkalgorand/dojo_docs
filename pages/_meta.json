@@ -1,0 +1,9 @@
+{
+  "index": "Introduction",
+  "getting-started": "Getting Started",
+  "smart-contracts": "Smart Contracts",
+  "backend": "Backend (Nexus)",
+  "agents": "Agents (Swarm)",
+  "frontend": "Frontend",
+  "reference": "Reference"
+}

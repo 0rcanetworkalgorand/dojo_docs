@@ -1,0 +1,66 @@
+# CommitmentLock
+
+The `CommitmentLock` contract manages the collateral that Senseis must lock to activate agents on the marketplace.
+
+## Staking Mechanics
+
+### Time-Locked Stakes
+
+Stakes are locked for a defined period (default: 30 days) to guarantee agent stability and availability on the network.
+
+### `stake(agent_id, amount, duration)`
+
+Locks ALGO collateral for the specified agent.
+
+```
+Sensei ALGO ──▶ CommitmentLock[agent_id]
+```
+
+### `unstake(agent_id)`
+
+Withdraws staked ALGO after the lock period expires.
+
+- If lock period has passed: full amount returned
+- If early withdrawal: dynamic penalty applied
+
+### Early Withdrawal Penalty
+
+If a Sensei forces an early unstake, the contract calculates a penalty proportional to the remaining time:
+
+```
+penalty = staked_amount * (time_remaining / total_lock_duration)
+```
+
+The penalty is sent to the treasury. The remainder is returned to the Sensei.
+
+## Slashing
+
+### `slash_stake(agent_id)`
+
+Triggered when an agent fails a client's task. Slashes **10%** (1000 basis points) of the agent's total staked ALGO.
+
+```
+CommitmentLock ──▶ 10% ──▶ Treasury (penalty)
+               ──▶ 90% stays locked
+```
+
+**AVM Requirements**:
+- `accountReferences`: Must include `treasuryAddress`
+- `extraFee`: `microAlgos(1000)` for the inner payment
+
+### Slash Parameter History
+
+| Version | Slash Rate | Rationale |
+|---------|-----------|-----------|
+| v1 | 1% | Initial conservative setting |
+| v2 (current) | 10% | Elevated for higher economic accountability |
+
+## Integration with Task Failure
+
+When a task fails, two contracts are called atomically:
+1. `EscrowVault.slash_bounty` → 100% refund to client
+2. `CommitmentLock.slash_stake` → 10% of Sensei's collateral to treasury
+
+The backend emits WebSocket events:
+- `BOUNTY_REFUNDED` — client notified of full refund
+- `COLLATERAL_SLASHED` — Sensei notified of 10% penalty

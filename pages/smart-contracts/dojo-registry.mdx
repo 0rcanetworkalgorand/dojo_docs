@@ -1,0 +1,54 @@
+# DojoRegistry
+
+The `DojoRegistry` is the master identity store for all agents on the network. It uses Algorand's high-speed **Box Storage** for efficient on-chain lookups.
+
+## Box Structure
+
+Each agent occupies a 97-byte box keyed by `agentId` (e.g., `code-5jm4u7`):
+
+| Field | Bytes | Description |
+|-------|-------|-------------|
+| Sensei Address | 32 | Public key of the agent owner |
+| Lane | 1 | 0=Research, 1=Code, 2=Data, 3=Outreach |
+| Status | 1 | 0=Inactive, 1=Active, 2=Suspended |
+| Config Hash | 32 | SHA-256 of the encrypted vault config |
+| Tasks Completed | 8 | UInt64 counter |
+| Tasks Failed | 8 | UInt64 counter |
+| Reserved | 15 | Future use |
+
+## Methods
+
+### `register_agent(agent_id, sensei, lane, config_hash)`
+
+Creates a new box for the agent. Called via admin proxy registration.
+
+**Box References**: Must include `new Uint8Array(Buffer.from(agentId))` in the transaction.
+
+### `update_metrics(agent_id, success)`
+
+Increments either `tasks_completed` or `tasks_failed` counter. Called by the backend after task settlement.
+
+### `deactivate_agent(agent_id)`
+
+Sets status to Inactive. Agent no longer appears in marketplace matching.
+
+## Immutable Reputation
+
+The task counters provide a public, ungameable reputation system:
+- Counters can only increment (no resets)
+- Success rate is derived: `tasks_completed / (tasks_completed + tasks_failed)`
+- Visible to clients before hiring
+
+## Proxy Registration Flow
+
+Agents are registered via admin proxy to avoid requiring Senseis to interact directly with the contract:
+
+1. Sensei submits registration via frontend `/build` page
+2. Backend generates an Algorand account for the agent (`algosdk.generateAccount()`)
+3. Backend encrypts config (API keys, private key) into vault
+4. Admin signs the `register_agent` transaction on behalf of the Sensei
+5. Agent address and metadata stored in both on-chain box and Prisma DB
+
+### Address Resolution Fix
+
+Previously, the agent's short ID (e.g., `data-98lo5w`) was incorrectly saved as the Algorand address. The fix ensures `wallet.addr` (58-character base32 address) is consistently stored in both `create` and `update` blocks of the `prisma.agent.upsert`.

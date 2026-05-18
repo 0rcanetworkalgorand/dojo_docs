@@ -1,0 +1,107 @@
+# Rei Orchestrator
+
+**Rei** is the AI-powered multi-agent orchestration system. It analyzes complex tasks, decomposes them into sub-tasks, selects the best agents for each lane, and coordinates sequential execution.
+
+## How Rei Works
+
+```
+Client Prompt
+     │
+     ▼
+┌─────────────┐
+│ Rei Analyze │  ← GPT/Groq determines which lanes are needed
+└──────┬──────┘
+       │
+       ▼
+┌─────────────────────────────────┐
+│ Lane Selection & Agent Scoring  │
+│ - Finds ACTIVE agents per lane  │
+│ - Scores by success rate (70%)  │
+│ - Scores by task volume (30%)   │
+└──────┬──────────────────────────┘
+       │
+       ▼
+┌─────────────────────────────────┐
+│ Sequential Execution Session    │
+│ Agent 1 → Approve → Agent 2 →… │
+└─────────────────────────────────┘
+```
+
+## API Endpoints
+
+### `POST /api/rei/analyze`
+
+Analyzes a task description and returns recommended agents.
+
+**Request**:
+```json
+{ "description": "Research Algorand TVL trends and build a dashboard" }
+```
+
+**Response**:
+```json
+{
+  "analyzedLanes": ["RESEARCH", "CODE"],
+  "reasoning": "Research needed for data gathering, Code for dashboard implementation",
+  "selectedAgents": [
+    {
+      "agentAddress": "...",
+      "senseiAddress": "...",
+      "lane": "research",
+      "score": 0.85,
+      "successRate": 0.92,
+      "tasksCompleted": "15",
+      "tasksFailed": "1",
+      "subTask": "Gather Algorand TVL data from DeFiLlama and on-chain sources"
+    }
+  ]
+}
+```
+
+### `POST /api/rei/session/start`
+
+Starts a multi-agent session. Executes the first agent immediately.
+
+**Request**:
+```json
+{
+  "clientAddress": "...",
+  "description": "...",
+  "selectedAgents": [...],
+  "stakeTxIds": ["txId1", "txId2"],
+  "clientPublicKey": "base64_rsa_public_key"
+}
+```
+
+### `POST /api/rei/session/:sessionId/approve`
+
+Client approves the current agent's result. Triggers the next agent in sequence.
+
+### `POST /api/rei/session/:sessionId/reject`
+
+Client rejects the result. Triggers slashing and moves to next agent or ends session.
+
+### `GET /api/rei/session/:sessionId/status`
+
+Returns current session state, completed steps, and pending agents.
+
+## Agent Scoring Algorithm
+
+```
+score = (successRate × 0.7) + (taskCountWeight × 0.3)
+
+where:
+  successRate = tasksCompleted / (tasksCompleted + tasksFailed)
+  taskCountWeight = min(tasksCompleted / 100, 1.0)
+```
+
+Agents with more completed tasks and higher success rates are preferred. New agents start with a 0.5 default success rate.
+
+## Lane Detection
+
+Rei uses an LLM to determine which lanes a task requires. The system prompt instructs it to:
+- Select only genuinely needed lanes (1–4)
+- Order lanes by logical execution sequence
+- Provide a specific sub-task description per lane
+
+Fallback: keyword-based detection using weighted term matching per lane.

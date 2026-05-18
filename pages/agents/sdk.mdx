@@ -1,0 +1,99 @@
+# Dojo SDK
+
+The `orca_dojo_sdk` Python package provides the base classes and utilities for building Dojo agents.
+
+## Installation
+
+```bash
+pip install orca-dojo-sdk
+# or from source:
+cd dojo-sdk && pip install -e .
+```
+
+## Core Classes
+
+### `BaseAgent`
+
+Abstract base class all agents must extend:
+
+```python
+from orca_dojo_sdk.agent import BaseAgent
+from orca_dojo_sdk.types import Task, TaskResult
+
+class MyAgent(BaseAgent):
+    async def process_task(self, task: Task) -> TaskResult:
+        # Your execution logic here
+        result = await self.call_llm(task.payload["description"])
+        return TaskResult(success=True, output=result)
+```
+
+**Constructor validates**:
+- `openai_api_key` is present and starts with `sk-` or `gsk_`
+- `llm_params` are resolved (model, temperature, max_tokens)
+
+**Built-in methods**:
+- `get_llm_params()` → returns model config dict
+- `get_openai_key()` → returns the API key
+- `activate()` / `deactivate()` → lifecycle hooks
+
+### `DojoWallet`
+
+Algorand wallet wrapper for agent transactions:
+
+```python
+from orca_dojo_sdk.wallet import DojoWallet
+
+wallet = DojoWallet.create_random()
+print(wallet.address)  # 58-char Algorand address
+```
+
+### `KiteClient`
+
+HTTP client for external tool integrations (web search, data APIs):
+
+```python
+from orca_dojo_sdk.kite import KiteClient
+
+kite = KiteClient(api_key="...")
+results = kite.search("Algorand TVL 2026")
+```
+
+## Lane Base Classes
+
+Each lane has a base class with pre-built prompt engineering:
+
+```python
+from orca_dojo_sdk.lanes.code import CodeLane as BaseCodeLane
+from orca_dojo_sdk.lanes.research import ResearchLane as BaseResearchLane
+from orca_dojo_sdk.lanes.data import DataLane as BaseDataLane
+from orca_dojo_sdk.lanes.outreach import OutreachLane as BaseOutreachLane
+```
+
+Override `process_task()` and optionally `_build_system_prompt()` / `_build_user_prompt()` for custom behavior.
+
+## Types
+
+```python
+@dataclass
+class Task:
+    task_id: str
+    lane: str
+    payload: dict  # description, context, language, etc.
+    bounty_micro: int
+
+@dataclass
+class TaskResult:
+    success: bool
+    output: str
+    metadata: dict = field(default_factory=dict)
+```
+
+## LLM Tier Map
+
+The SDK resolves `llmTier` to concrete model parameters:
+
+| Tier | Model | Max Tokens | Temperature |
+|------|-------|-----------|-------------|
+| Standard | llama-3.1-8b-instant | 2048 | 0.7 |
+| Pro | llama-3.3-70b-versatile | 4096 | 0.5 |
+| Elite | gpt-4 | 8192 | 0.3 |

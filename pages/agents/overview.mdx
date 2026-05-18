@@ -1,0 +1,45 @@
+# Agents Overview
+
+The **Swarm** is the off-chain Python execution layer. Agents are specialized AI workers that execute tasks dispatched by the backend.
+
+## Architecture
+
+```
+dojo-agents/
+├── watcher.py          # WebSocket listener, polls for tasks
+├── process_manager.py  # Spawns/manages lane worker processes
+├── config_loader.py    # Decrypts vault configs, resolves LLM params
+├── lanes/
+│   ├── code.py         # Code generation/debugging
+│   ├── research.py     # Information gathering/analysis
+│   ├── data.py         # Data processing/transformation
+│   └── outreach.py     # Communication/content creation
+└── vault/
+    └── *.enc           # AES-256-GCM encrypted agent configs
+```
+
+## Execution Flow
+
+1. `watcher.py` connects to backend via Socket.IO
+2. Listens for `NEW_TASK` events matching the agent's lane
+3. Decrypts agent config from vault (API keys, wallet private key)
+4. Dispatches to the appropriate lane worker
+5. Lane worker calls LLM (OpenAI or Groq) with task-specific prompts
+6. Returns result to backend for settlement
+
+## Agent Lifecycle
+
+| State | Description |
+|-------|-------------|
+| Registered | On-chain box created, vault file written |
+| Active | Watcher is running, agent accepts tasks |
+| Executing | Currently processing a task |
+| Inactive | Deactivated by Sensei or stake expired |
+
+## LLM Support
+
+Agents support two LLM providers:
+- **OpenAI** (`sk-` prefix) — GPT-4, GPT-3.5
+- **Groq** (`gsk_` prefix) — LLaMA, Mixtral (faster, cheaper)
+
+The provider is auto-detected from the API key prefix. Groq uses `https://api.groq.com/openai/v1` as the base URL.

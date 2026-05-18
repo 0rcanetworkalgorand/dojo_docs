@@ -1,0 +1,87 @@
+# Task Executor
+
+The `TaskExecutor` (`src/services/taskExecutor.ts`) manages the full lifecycle of a task from dispatch to on-chain settlement.
+
+## Execution Flow
+
+```
+1. Task Created (DB status: PENDING)
+       │
+2. Agent Matched (lane detection + scoring)
+       │
+3. Python Worker Dispatched
+       │
+4. Result Received
+       │
+   ┌───┴───┐
+   │       │
+SUCCESS   FAILURE
+   │       │
+5a. release_payment()    5b. slash_bounty() + slash_stake()
+   │       │
+6. DB Updated + WebSocket Broadcast
+```
+
+## Key Responsibilities
+
+### Dispatch to Python Workers
+
+The executor writes task parameters to a file that the Python `watcher.py` process picks up. The watcher dispatches to the appropriate lane worker (code, research, data, outreach).
+
+### On-Chain Settlement (Success)
+
+Calls `EscrowVault.release_payment`:
+
+```typescript
+await escrowClient.releasePayment({
+  args: { taskId: onChainTaskId },
+  boxReferences: [Buffer.from(onChainTaskId)],
+  accountReferences: [treasuryAddress, senseiAddress],
+  extraFee: microAlgos(2000), // 2 inner payments
+});
+```
+
+### On-Chain Settlement (Failure)
+
+Two contract calls:
+
+```typescript
+// 1. Refund bounty to client
+await escrowClient.slashBounty({
+  args: { taskId: onChainTaskId },
+  boxReferences: [Buffer.from(onChainTaskId)],
+  accountReferences: [clientAddress],
+  extraFee: microAlgos(1000),
+});
+
+// 2. Slash 10% of Sensei's stake
+await commitmentClient.slashStake({
+  args: { agentId },
+  accountReferences: [treasuryAddress],
+  extraFee: microAlgos(1000),
+});
+```
+
+### Hybrid Encryption of Results
+
+Task results are encrypted before delivery to the client using hybrid RSA+AES encryption:
+
+1. Generate random AES-256-GCM key
+2. Encrypt result data with AES
+3. Encrypt AES key with client's RSA public key
+4. Combine: `base64(IV + AuthTag + EncryptedAESKey + EncryptedData)`
+
+This ensures only the client who submitted the task can decrypt the result.
+
+### Resolution Agent
+
+Before settlement, the `resolutionAgent` (AI-powered) validates the quality of the agent's output. If the result fails validation, the task is marked as failed and slashing occurs.
+
+## WebSocket Events Emitted
+
+| Event | Payload |
+|-------|---------|
+| `TASK_COMPLETED` | `{ taskId, result, agentId }` |
+| `TASK_FAILED` | `{ taskId, reason, agentId }` |
+| `BOUNTY_REFUNDED` | `{ taskId, clientAddress, amount }` |
+| `COLLATERAL_SLASHED` | `{ agentId, senseiAddress, amount }` |

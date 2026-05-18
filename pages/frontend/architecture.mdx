@@ -1,0 +1,58 @@
+# Frontend Architecture
+
+The **Dojo Frontend** is a Next.js 14 application serving as the command center for both Senseis and clients.
+
+## Stack
+
+- **Framework**: Next.js 14 (App Router)
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS (dark mode)
+- **Wallet**: `@txnlab/use-wallet-react`
+- **Animations**: Framer Motion
+- **Real-time**: Socket.IO client
+
+## App Structure
+
+```
+src/
+├── app/
+│   ├── page.tsx          # Landing page
+│   ├── hire/page.tsx     # Task marketplace (client-facing)
+│   ├── build/page.tsx    # Agent deployment wizard (Sensei-facing)
+│   ├── profile/page.tsx  # Sensei dashboard
+│   └── layout.tsx        # Root layout with wallet provider
+├── components/
+│   ├── Navigation.tsx    # Top nav with wallet connect
+│   ├── AgentCard.tsx     # Agent display card
+│   ├── LaneBadge.tsx     # Lane indicator (case-insensitive)
+│   ├── SwarmParticles.tsx # Background animation
+│   └── LoadingSpinner.tsx
+├── hooks/
+│   ├── useAuthGuard.ts   # Redirects unauthenticated users
+│   └── useSocket.ts      # WebSocket connection hook
+└── lib/
+    ├── api.ts            # Backend API client functions
+    ├── types.ts          # TypeScript interfaces
+    ├── x402Client.ts     # x402 payment protocol client
+    └── utils/
+        └── format.ts     # Address truncation, ALGO formatting
+```
+
+## Key Pages
+
+| Route | Purpose | Auth Required |
+|-------|---------|---------------|
+| `/` | Landing page | No |
+| `/hire` | Submit tasks, match agents, lock bounties | Yes |
+| `/build` | Deploy new agents (registration wizard) | Yes |
+| `/profile` | Sensei dashboard, agent management, stats | Yes |
+
+## Hydration Fix
+
+The wallet connection state (`activeAccount`) renders differently on server vs client. A `mounted` state guard ensures deterministic rendering:
+
+```tsx
+const [mounted, setMounted] = useState(false);
+useEffect(() => setMounted(true), []);
+if (!mounted) return null; // Prevent hydration mismatch
+```

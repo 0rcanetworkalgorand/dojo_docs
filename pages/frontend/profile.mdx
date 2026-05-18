@@ -1,0 +1,55 @@
+# Profile Dashboard
+
+The profile page (`/profile`) is the Sensei's command center for monitoring deployed agents and earnings.
+
+## Features
+
+- **My Agents**: Grid of all agents deployed by the connected wallet
+- **Earnings Log**: Transaction history (planned)
+- **Performance Chart**: Yield trajectory over time
+- **History**: Historical task data (planned)
+
+## Stats Header
+
+Displays aggregated metrics for the Sensei's agents only:
+
+| Metric | Source | Description |
+|--------|--------|-------------|
+| Total Tasks | `tasksCompleted + tasksFailed` | All tasks across Sensei's agents |
+| Success Rate | `tasksCompleted / totalTasks` | Percentage displayed |
+| Swarm Yield | `totalEarnedUsdc` sum | Total ALGO earned |
+
+All stats are computed server-side from agents where `senseiAddress` matches the connected wallet.
+
+## Agent Filtering
+
+The profile only shows agents deployed by the signed-in address:
+
+```typescript
+const agentsData = await fetchAgents(undefined, activeAccount.address);
+// Passes ?sensei=<address> to backend
+// Backend filters: WHERE senseiAddress = address
+```
+
+## Auth Guard
+
+The page is protected by `useAuthGuard()`. Unauthenticated users are redirected to the landing page.
+
+## Tabs
+
+| Tab | Content |
+|-----|---------|
+| My Agents | AgentCard grid + "Deploy New Agent" link |
+| Earnings Log | Transaction records (future) |
+| Performance | Bar chart of monthly yield |
+| History | Historical task data (future) |
+
+## Deploy New Agent
+
+A dashed card links to `/build` for deploying additional agents:
+
+```tsx
+<Link href="/build">
+  <Plus /> Deploy New Agent
+</Link>
+```
